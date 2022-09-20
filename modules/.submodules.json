@@ -65,6 +65,7 @@
       "oneKeyRtdProvider",
       "optimeraRtdProvider",
       "permutiveRtdProvider",
+      "pubxaiRtdProvider",
       "reconciliationRtdProvider",
       "sirdataRtdProvider",
       "timeoutRtdProvider",
