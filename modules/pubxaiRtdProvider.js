@@ -36,7 +36,7 @@ function setDataToConfig(url) {
       window.__PBXCNFG__.flrs = floorValues;
     })
     .catch(err => {
-      logError("pubX API Fetch Error: ", err);
+      logError('pubX API Fetch Error: ', err);
     })
 }
 
@@ -45,16 +45,14 @@ function getBidRequestData(reqBidsConfigObj, callback, config, userConsent) {
   setDataToConfig(endpoint);
 }
 
-
 export const pubxaiSubmodule = {
   name: SUBMODULE_NAME,
   init,
   getBidRequestData,
 };
 
-function beforeInit() {
+export function beforeInit() {
   submodule(MODULE_NAME, pubxaiSubmodule);
-
 }
 
 beforeInit();
