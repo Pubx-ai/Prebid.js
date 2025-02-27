@@ -1,28 +1,41 @@
-import adapter from '../libraries/analyticsAdapter/AnalyticsAdapter.js';
+import adapter from "../libraries/analyticsAdapter/AnalyticsAdapter.js";
 import {
-  getGptSlotInfoForAdUnitCode, getGptSlotForAdUnitCode
-} from '../libraries/gptUtils/gptUtils.js';
-import { getDeviceType, getBrowser, getOS } from '../libraries/userAgentUtils/index.js';
-import { MODULE_TYPE_ANALYTICS } from '../src/activities/modules.js';
-import adapterManager from '../src/adapterManager.js';
-import { sendBeacon } from '../src/ajax.js'
-import { EVENTS } from '../src/constants.js';
-import { getGlobal } from '../src/prebidGlobal.js';
-import { getStorageManager } from '../src/storageManager.js';
+  getGptSlotInfoForAdUnitCode,
+  getGptSlotForAdUnitCode,
+} from "../libraries/gptUtils/gptUtils.js";
 import {
-  deepAccess, parseSizesInput, getWindowLocation, buildUrl, cyrb53Hash
-} from '../src/utils.js';
+  getDeviceType,
+  getBrowser,
+  getOS,
+} from "../libraries/userAgentUtils/index.js";
+import { MODULE_TYPE_ANALYTICS } from "../src/activities/modules.js";
+import adapterManager from "../src/adapterManager.js";
+import { sendBeacon } from "../src/ajax.js";
+import { EVENTS } from "../src/constants.js";
+import { getGlobal } from "../src/prebidGlobal.js";
+import { getStorageManager } from "../src/storageManager.js";
+import {
+  deepAccess,
+  parseSizesInput,
+  getWindowLocation,
+  buildUrl,
+  cyrb53Hash,
+} from "../src/utils.js";
 
 let initOptions;
 
-const emptyUrl = '';
-const analyticsType = 'endpoint';
-const adapterCode = 'pubxai';
-const pubxaiAnalyticsVersion = 'v2.1.0';
-const defaultHost = 'api.pbxai.com';
-const auctionPath = '/analytics/auction';
-const winningBidPath = '/analytics/bidwon';
-const storage = getStorageManager({ moduleType: MODULE_TYPE_ANALYTICS, moduleName: adapterCode })
+const emptyUrl = "";
+const analyticsType = "endpoint";
+const adapterCode = "pubxai";
+const pubxaiAnalyticsVersion = "v2.1.0";
+const defaultHost = "api.pbxai.com";
+const auctionPath = "/analytics/auction";
+const winningBidPath = "/analytics/bidwon";
+let refreshRank = 0;
+const storage = getStorageManager({
+  moduleType: MODULE_TYPE_ANALYTICS,
+  moduleName: adapterCode,
+});
 
 /**
  * The sendCache is a global cache object which tracks the pending sends
@@ -55,7 +68,7 @@ export const auctionCache = new Proxy(
         target[name] = {
           bids: [],
           auctionDetail: {
-            refreshRank: Object.keys(target).length,
+            refreshRank: refreshRank++,
             auctionId: name,
           },
           floorDetail: {},
@@ -76,8 +89,10 @@ export const auctionCache = new Proxy(
           consentDetail: {
             consentTypes: Object.keys(getGlobal().getConsentMetadata?.() || {}),
           },
-          pmacDetail: JSON.parse(storage.getDataFromLocalStorage('pubx:pmac')) || {}, // {auction_1: {floor:0.23,maxBid:0.34,bidCount:3},auction_2:{floor:0.13,maxBid:0.14,bidCount:2}
-          extraData: JSON.parse(storage.getDataFromLocalStorage('pubx:extraData')) || {},
+          pmacDetail:
+            JSON.parse(storage.getDataFromLocalStorage("pubx:pmac")) || {}, // {auction_1: {floor:0.23,maxBid:0.34,bidCount:3},auction_2:{floor:0.13,maxBid:0.14,bidCount:2}
+          extraData:
+            JSON.parse(storage.getDataFromLocalStorage("pubx:extraData")) || {},
           initOptions: {
             ...initOptions,
             auctionId: name, // back-compat
@@ -96,20 +111,21 @@ export const auctionCache = new Proxy(
  * @returns {object} key value pairs from the adserver
  */
 const getAdServerDataForBid = (bid) => {
-  const gptSlot = getGptSlotForAdUnitCode(bid);
-  if (gptSlot) {
-    return Object.fromEntries(
-      gptSlot
-        .getTargetingKeys()
-        .filter(
-          (key) =>
-            key.startsWith('pubx-') ||
-            (key.startsWith('hb_') && (key.match(/_/g) || []).length === 1)
-        )
-        .map((key) => [key, gptSlot.getTargeting(key)])
-    );
+  const adunitCode = bid.adUnitCode || "";
+  const gptSlot = getGptSlotForAdUnitCode(adunitCode);
+  if (!gptSlot) {
+    return {};
   }
-  return {}; // TODO: support more ad servers
+  return Object.fromEntries(
+    gptSlot
+      .getTargetingKeys()
+      .filter(
+        (key) =>
+          key.startsWith("pubx-") ||
+          (key.startsWith("hb_") && (key.match(/_/g) || []).length === 1)
+      )
+      .map((key) => [key, gptSlot.getTargeting(key)])
+  );
 };
 
 /**
@@ -141,9 +157,9 @@ const extractBid = (bidResponse) => {
     transactionId: bidResponse.transactionId,
     bidId: bidResponse.bidId || bidResponse.requestId,
     placementId: bidResponse.params
-      ? deepAccess(bidResponse, 'params.0.placementId')
+      ? deepAccess(bidResponse, "params.0.placementId")
       : null,
-    source: bidResponse.source || 'null',
+    source: bidResponse.source || "null",
   };
 };
 
@@ -187,11 +203,7 @@ const track = ({ eventType, args }) => {
         adUnitCodes: args.adUnits.map((i) => i.code),
         timestamp: args.timestamp,
       });
-      if (
-        auctionCache[args.auctionId].bids.every((bid) => [1, 3].includes(bid.bidType))
-      ) {
-        prepareSend(args.auctionId);
-      }
+      prepareAuctionSend(args.auctionId);
       break;
     // send the prebid winning bid back to pubx
     case EVENTS.BID_WON:
@@ -210,7 +222,7 @@ const track = ({ eventType, args }) => {
       });
       winningBid.adServerData = getAdServerDataForBid(winningBid);
       auctionCache[winningBid.auctionId].winningBid = winningBid;
-      prepareSend(winningBid.auctionId);
+      prepareSendWinningBids(winningBid);
       break;
     // do nothing
     default:
@@ -219,87 +231,118 @@ const track = ({ eventType, args }) => {
 };
 
 /**
- * If true, send data back to pubxai
- * @param {string} auctionId
- * @param {number} samplingRate
- * @returns {boolean}
+ * Determines if an event should be sent to PubxAI based on sampling rate
+ * @param {string} auctionId - Prebid Auction ID
+ * @param {number} samplingRate - The sampling rate to apply (default: 1)
+ * @returns {boolean} - True if the event should be sent, false otherwise
  */
 const shouldFireEventRequest = (auctionId, samplingRate = 1) => {
   return parseInt(cyrb53Hash(auctionId)) % samplingRate === 0;
 };
 
 /**
- * prepare the payload for sending auction data back to pubx.ai
- * @param {string} auctionId the auction to send
+ * Stores event data in the send cache for later transmission
+ * @param {Object} eventData - Information about the event type and required data
+ * @param {string[]} eventData.requiredKeys - Keys required to be present in the auction data
+ * @param {string} eventData.path - API endpoint path for this event type
+ * @param {Object} auctionData - The auction data to be sent
  */
-const prepareSend = (auctionId) => {
-  const auctionData = Object.assign({}, auctionCache[auctionId]);
-  if (!shouldFireEventRequest(auctionId, initOptions.samplingRate)) {
+const storeDataInSendCache = (eventData, auctionData) => {
+  if (!eventData.requiredKeys.every((key) => !!auctionData[key])) {
     return;
   }
-  [
-    {
-      path: winningBidPath,
-      requiredKeys: [
-        'winningBid',
-        'pageDetail',
-        'deviceDetail',
-        'floorDetail',
-        'auctionDetail',
-        'userDetail',
-        'consentDetail',
-        'pmacDetail',
-        'extraData',
-        'initOptions',
-      ],
-      eventType: 'win',
+
+  const pubxaiAnalyticsRequestUrl = buildUrl({
+    protocol: "https",
+    hostname:
+      (auctionData.initOptions && auctionData.initOptions.hostName) ||
+      defaultHost,
+    pathname: eventData.path,
+    search: {
+      auctionTimestamp: auctionData.auctionDetail.timestamp,
+      pubxaiAnalyticsVersion: pubxaiAnalyticsVersion,
+      prebidVersion: "$prebid.version$",
+      pubxId: initOptions.pubxId,
     },
-    {
-      path: auctionPath,
-      requiredKeys: [
-        'bids',
-        'pageDetail',
-        'deviceDetail',
-        'floorDetail',
-        'auctionDetail',
-        'userDetail',
-        'consentDetail',
-        'pmacDetail',
-        'extraData',
-        'initOptions',
-      ],
-      eventType: 'auction',
-    },
-  ].forEach(({ path, requiredKeys, eventType }) => {
-    const data = Object.fromEntries(
-      requiredKeys.map((key) => [key, auctionData[key]])
-    );
-    if (
-      auctionCache[auctionId].sendAs.includes(eventType) ||
-      !requiredKeys.every((key) => !!auctionData[key])
-    ) {
-      return;
-    }
-    const pubxaiAnalyticsRequestUrl = buildUrl({
-      protocol: 'https',
-      hostname:
-        (auctionData.initOptions && auctionData.initOptions.hostName) ||
-        defaultHost,
-      pathname: path,
-      search: {
-        auctionTimestamp: auctionData.auctionDetail.timestamp,
-        pubxaiAnalyticsVersion: pubxaiAnalyticsVersion,
-        prebidVersion: '$prebid.version$',
-        pubxId: initOptions.pubxId,
-      },
-    });
-    sendCache[pubxaiAnalyticsRequestUrl].push(data);
-    auctionCache[auctionId].sendAs.push(eventType);
   });
+
+  const data = Object.fromEntries(
+    eventData.requiredKeys.map((key) => [key, auctionData[key]])
+  );
+
+  sendCache[pubxaiAnalyticsRequestUrl].push(data);
 };
 
+/**
+ * Prepares winning bid data to be sent to PubxAI
+ * @param {Object} winningBid - The winning bid object
+ */
+const prepareSendWinningBids = (winningBid) => {
+  const { auctionId } = winningBid;
+
+  if (!shouldFireEventRequest(auctionId)) return;
+
+  const auctionData = Object.assign({}, auctionCache[auctionId]);
+
+  auctionData.winningBid = winningBid;
+
+  const eventData = {
+    path: winningBidPath,
+    requiredKeys: [
+      "winningBid",
+      "pageDetail",
+      "deviceDetail",
+      "floorDetail",
+      "auctionDetail",
+      "userDetail",
+      "consentDetail",
+      "pmacDetail",
+      "extraData",
+      "initOptions",
+    ],
+    eventType: "win",
+  };
+
+  storeDataInSendCache(eventData, auctionData);
+};
+
+/**
+ * Prepares auction data to be sent to PubxAI
+ * @param {string} auctionId - Prebid auction ID for the auction to prepare for sending
+ */
+const prepareAuctionSend = (auctionId) => {
+  if (!shouldFireEventRequest(auctionId)) return;
+
+  const auctionData = Object.assign({}, auctionCache[auctionId]);
+  const eventData = {
+    path: auctionPath,
+    requiredKeys: [
+      "bids",
+      "pageDetail",
+      "deviceDetail",
+      "floorDetail",
+      "auctionDetail",
+      "userDetail",
+      "consentDetail",
+      "pmacDetail",
+      "extraData",
+      "initOptions",
+    ],
+    eventType: "auction",
+  };
+
+  if (auctionCache[auctionId].sendAs.includes(eventData.eventType)) return;
+
+  storeDataInSendCache(eventData, auctionData);
+  auctionCache[auctionId].sendAs.push(eventData.eventType);
+};
+
+/**
+ * Sends all cached events to PubxAI endpoints
+ * Handles chunking large payloads to stay under size limits
+ */
 const send = () => {
-  const toBlob = (d) => new Blob([JSON.stringify(d)], { type: 'text/json' });
+  const toBlob = (d) => new Blob([JSON.stringify(d)], { type: "text/json" });
 
   Object.entries(sendCache).forEach(([requestUrl, events]) => {
     let payloadStart = 0;
@@ -323,14 +366,17 @@ const send = () => {
 
 // register event listener to send logs when user leaves page
 if (document.visibilityState) {
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') {
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") {
       send();
     }
   });
 }
 
-// declare the analytics adapter
+/**
+ * PubxAI Analytics adapter for Prebid.js
+ * Tracks auction events and sends data to PubxAI for analytics
+ */
 var pubxaiAnalyticsAdapter = Object.assign(
   adapter({
     emptyUrl,
@@ -339,8 +385,15 @@ var pubxaiAnalyticsAdapter = Object.assign(
   { track }
 );
 
+// Store the original enableAnalytics function
 pubxaiAnalyticsAdapter.originEnableAnalytics =
   pubxaiAnalyticsAdapter.enableAnalytics;
+
+/**
+ * Custom enableAnalytics implementation that captures configuration options
+ * @param {Object} config - The analytics adapter configuration
+ * @param {Object} config.options - PubxAI specific configuration options
+ */
 pubxaiAnalyticsAdapter.enableAnalytics = (config) => {
   initOptions = config.options;
   pubxaiAnalyticsAdapter.originEnableAnalytics(config);
