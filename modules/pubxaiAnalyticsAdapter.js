@@ -1,36 +1,36 @@
-import adapter from "../libraries/analyticsAdapter/AnalyticsAdapter.js";
+import adapter from '../libraries/analyticsAdapter/AnalyticsAdapter.js';
 import {
   getGptSlotInfoForAdUnitCode,
   getGptSlotForAdUnitCode,
-} from "../libraries/gptUtils/gptUtils.js";
+} from '../libraries/gptUtils/gptUtils.js';
 import {
   getDeviceType,
   getBrowser,
   getOS,
-} from "../libraries/userAgentUtils/index.js";
-import { MODULE_TYPE_ANALYTICS } from "../src/activities/modules.js";
-import adapterManager from "../src/adapterManager.js";
-import { sendBeacon } from "../src/ajax.js";
-import { EVENTS } from "../src/constants.js";
-import { getGlobal } from "../src/prebidGlobal.js";
-import { getStorageManager } from "../src/storageManager.js";
+} from '../libraries/userAgentUtils/index.js';
+import { MODULE_TYPE_ANALYTICS } from '../src/activities/modules.js';
+import adapterManager from '../src/adapterManager.js';
+import { sendBeacon } from '../src/ajax.js';
+import { EVENTS } from '../src/constants.js';
+import { getGlobal } from '../src/prebidGlobal.js';
+import { getStorageManager } from '../src/storageManager.js';
 import {
   deepAccess,
   parseSizesInput,
   getWindowLocation,
   buildUrl,
   cyrb53Hash,
-} from "../src/utils.js";
+} from '../src/utils.js';
 
 let initOptions;
 
-const emptyUrl = "";
-const analyticsType = "endpoint";
-const adapterCode = "pubxai";
-const pubxaiAnalyticsVersion = "v2.1.0";
-const defaultHost = "api.pbxai.com";
-const auctionPath = "/analytics/auction";
-const winningBidPath = "/analytics/bidwon";
+const emptyUrl = '';
+const analyticsType = 'endpoint';
+const adapterCode = 'pubxai';
+const pubxaiAnalyticsVersion = 'v2.1.0';
+const defaultHost = 'api.pbxai.com';
+const auctionPath = '/analytics/auction';
+const winningBidPath = '/analytics/bidwon';
 let refreshRank = 0;
 const storage = getStorageManager({
   moduleType: MODULE_TYPE_ANALYTICS,
@@ -90,9 +90,9 @@ export const auctionCache = new Proxy(
             consentTypes: Object.keys(getGlobal().getConsentMetadata?.() || {}),
           },
           pmacDetail:
-            JSON.parse(storage.getDataFromLocalStorage("pubx:pmac")) || {}, // {auction_1: {floor:0.23,maxBid:0.34,bidCount:3},auction_2:{floor:0.13,maxBid:0.14,bidCount:2}
+            JSON.parse(storage.getDataFromLocalStorage('pubx:pmac')) || {}, // {auction_1: {floor:0.23,maxBid:0.34,bidCount:3},auction_2:{floor:0.13,maxBid:0.14,bidCount:2}
           extraData:
-            JSON.parse(storage.getDataFromLocalStorage("pubx:extraData")) || {},
+            JSON.parse(storage.getDataFromLocalStorage('pubx:extraData')) || {},
           initOptions: {
             ...initOptions,
             auctionId: name, // back-compat
@@ -111,7 +111,7 @@ export const auctionCache = new Proxy(
  * @returns {object} key value pairs from the adserver
  */
 const getAdServerDataForBid = (bid) => {
-  const adunitCode = bid.adUnitCode || "";
+  const adunitCode = bid.adUnitCode || '';
   const gptSlot = getGptSlotForAdUnitCode(adunitCode);
   if (!gptSlot) {
     return {};
@@ -121,8 +121,8 @@ const getAdServerDataForBid = (bid) => {
       .getTargetingKeys()
       .filter(
         (key) =>
-          key.startsWith("pubx-") ||
-          (key.startsWith("hb_") && (key.match(/_/g) || []).length === 1)
+          key.startsWith('pubx-') ||
+          (key.startsWith('hb_') && (key.match(/_/g) || []).length === 1)
       )
       .map((key) => [key, gptSlot.getTargeting(key)])
   );
@@ -157,9 +157,9 @@ const extractBid = (bidResponse) => {
     transactionId: bidResponse.transactionId,
     bidId: bidResponse.bidId || bidResponse.requestId,
     placementId: bidResponse.params
-      ? deepAccess(bidResponse, "params.0.placementId")
+      ? deepAccess(bidResponse, 'params.0.placementId')
       : null,
-    source: bidResponse.source || "null",
+    source: bidResponse.source || 'null',
   };
 };
 
@@ -253,7 +253,7 @@ const storeDataInSendCache = (eventData, auctionData) => {
   }
 
   const pubxaiAnalyticsRequestUrl = buildUrl({
-    protocol: "https",
+    protocol: 'https',
     hostname:
       (auctionData.initOptions && auctionData.initOptions.hostName) ||
       defaultHost,
@@ -261,7 +261,7 @@ const storeDataInSendCache = (eventData, auctionData) => {
     search: {
       auctionTimestamp: auctionData.auctionDetail.timestamp,
       pubxaiAnalyticsVersion: pubxaiAnalyticsVersion,
-      prebidVersion: "$prebid.version$",
+      prebidVersion: '$prebid.version$',
       pubxId: initOptions.pubxId,
     },
   });
@@ -289,18 +289,18 @@ const prepareSendWinningBids = (winningBid) => {
   const eventData = {
     path: winningBidPath,
     requiredKeys: [
-      "winningBid",
-      "pageDetail",
-      "deviceDetail",
-      "floorDetail",
-      "auctionDetail",
-      "userDetail",
-      "consentDetail",
-      "pmacDetail",
-      "extraData",
-      "initOptions",
+      'winningBid',
+      'pageDetail',
+      'deviceDetail',
+      'floorDetail',
+      'auctionDetail',
+      'userDetail',
+      'consentDetail',
+      'pmacDetail',
+      'extraData',
+      'initOptions',
     ],
-    eventType: "win",
+    eventType: 'win',
   };
 
   storeDataInSendCache(eventData, auctionData);
@@ -317,18 +317,18 @@ const prepareAuctionSend = (auctionId) => {
   const eventData = {
     path: auctionPath,
     requiredKeys: [
-      "bids",
-      "pageDetail",
-      "deviceDetail",
-      "floorDetail",
-      "auctionDetail",
-      "userDetail",
-      "consentDetail",
-      "pmacDetail",
-      "extraData",
-      "initOptions",
+      'bids',
+      'pageDetail',
+      'deviceDetail',
+      'floorDetail',
+      'auctionDetail',
+      'userDetail',
+      'consentDetail',
+      'pmacDetail',
+      'extraData',
+      'initOptions',
     ],
-    eventType: "auction",
+    eventType: 'auction',
   };
 
   if (auctionCache[auctionId].sendAs.includes(eventData.eventType)) return;
@@ -342,7 +342,7 @@ const prepareAuctionSend = (auctionId) => {
  * Handles chunking large payloads to stay under size limits
  */
 const send = () => {
-  const toBlob = (d) => new Blob([JSON.stringify(d)], { type: "text/json" });
+  const toBlob = (d) => new Blob([JSON.stringify(d)], { type: 'text/json' });
 
   Object.entries(sendCache).forEach(([requestUrl, events]) => {
     let payloadStart = 0;
@@ -366,8 +366,8 @@ const send = () => {
 
 // register event listener to send logs when user leaves page
 if (document.visibilityState) {
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "hidden") {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
       send();
     }
   });
