@@ -396,6 +396,8 @@ pubxaiAnalyticsAdapter.originEnableAnalytics =
  */
 pubxaiAnalyticsAdapter.enableAnalytics = (config) => {
   initOptions = config.options;
+  // Reset the refreshRank to 0
+  refreshRank = 0;
   pubxaiAnalyticsAdapter.originEnableAnalytics(config);
 };
 
