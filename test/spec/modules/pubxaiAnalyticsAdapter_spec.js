@@ -748,7 +748,7 @@ describe('pubxai analytics adapter', () => {
       // Simulate "navigate away" behaviour
       document.dispatchEvent(new Event('visibilitychange'));
 
-      expect(navigator.sendBeacon.callCount).to.equal(0);
+      expect(navigator.sendBeacon.callCount).to.equal(1);
 
       // Step 6: Send auction bid won event
       events.emit(EVENTS.BID_WON, prebidEvent['bidWon']);
@@ -762,7 +762,7 @@ describe('pubxai analytics adapter', () => {
         const [expectedUrl, expectedData] = arg;
         const parsedUrl = new URL(expectedUrl);
         expect(parsedUrl.pathname).to.equal(
-          ['/analytics/bidwon', '/analytics/auction'][index]
+          ['/analytics/auction', '/analytics/bidwon'][index]
         );
         expect(Object.fromEntries(parsedUrl.searchParams)).to.deep.equal({
           auctionTimestamp: '1616654312804',
@@ -772,7 +772,7 @@ describe('pubxai analytics adapter', () => {
         });
         expect(expectedData.type).to.equal('text/json');
         expect(JSON.parse(await readBlobSafariCompat(expectedData))).to.deep.equal([
-          [expectedAfterBidWon, expectedAfterBid][index],
+          [expectedAfterBid, expectedAfterBidWon][index],
         ]);
       }
     });
@@ -816,6 +816,7 @@ describe('pubxai analytics adapter', () => {
       });
 
       // Step 9: check that the data sent in the request is correct
+      // Update the refreshRank to 1
       expect(expectedData.type).to.equal('text/json');
       expect(JSON.parse(await readBlobSafariCompat(expectedData))).to.deep.equal([
         {
@@ -980,7 +981,7 @@ describe('pubxai analytics adapter', () => {
       document.dispatchEvent(new Event('visibilitychange'));
 
       // Step 9: check the number of calls made to pubx.ai
-      expect(navigator.sendBeacon.callCount).to.equal(0);
+      expect(navigator.sendBeacon.callCount).to.equal(1);
 
       // Step 10: Send auction bid won event for auction 1
       events.emit(EVENTS.BID_WON, prebidEvent['bidWon']);
@@ -1007,7 +1008,7 @@ describe('pubxai analytics adapter', () => {
       document.dispatchEvent(new Event('visibilitychange'));
 
       // Step 13: check the number of calls made to pubx.ai
-      expect(navigator.sendBeacon.callCount).to.equal(2);
+      expect(navigator.sendBeacon.callCount).to.equal(3);
 
       // Step 14: Send auction bid won event for auction 2
       events.emit(
@@ -1031,7 +1032,7 @@ describe('pubxai analytics adapter', () => {
         const parsedUrl = new URL(expectedUrl);
         const auctionIdMapFn = index < 2 ? (i, _) => i : replaceProperty;
         expect(parsedUrl.pathname).to.equal(
-          ['/analytics/bidwon', '/analytics/auction'][index % 2]
+          ['/analytics/auction', '/analytics/bidwon'][index % 2]
         );
         expect(Object.fromEntries(parsedUrl.searchParams)).to.deep.equal({
           auctionTimestamp: '1616654312804',
@@ -1041,7 +1042,7 @@ describe('pubxai analytics adapter', () => {
         });
         expect(expectedData.type).to.equal('text/json');
         expect(JSON.parse(await readBlobSafariCompat(expectedData))).to.deep.equal([
-          auctionIdMapFn([expectedAfterBidWon, expectedAfterBid][index % 2], [
+          auctionIdMapFn([expectedAfterBid, expectedAfterBidWon][index % 2], [
             {
               field: 'auctionId',
               updated: '"auction2"',
@@ -1148,7 +1149,7 @@ describe('pubxai analytics adapter', () => {
         const [expectedUrl, expectedData] = arg;
         const parsedUrl = new URL(expectedUrl);
         expect(parsedUrl.pathname).to.equal(
-          ['/analytics/bidwon', '/analytics/auction'][index]
+          ['/analytics/auction', '/analytics/bidwon'][index]
         );
         expect(Object.fromEntries(parsedUrl.searchParams)).to.deep.equal({
           auctionTimestamp: '1616654312804',
@@ -1158,8 +1159,8 @@ describe('pubxai analytics adapter', () => {
         });
         expect(expectedData.type).to.equal('text/json');
         expect(JSON.parse(await readBlobSafariCompat(expectedData))).to.deep.equal([
-          [expectedAfterBidWon, expectedAfterBid][index],
-          replaceProperty([expectedAfterBidWon, expectedAfterBid][index], [
+          [expectedAfterBid, expectedAfterBidWon][index],
+          replaceProperty([expectedAfterBid, expectedAfterBidWon][index], [
             {
               field: 'auctionId',
               updated: '"auction2"',
